@@ -265,7 +265,7 @@ class SaveAudioAdvanced(IO.ComfyNode):
                             IO.Combo.Input("quality", options=["64k", "96k", "128k", "192k", "320k"], default="128k"),
                         ]),
                     ],
-                    tooltip="The file format in which to save the image.",
+                    tooltip="The file format in which to save the audio.",
                 ),
             ],
             hidden=[IO.Hidden.prompt, IO.Hidden.extra_pnginfo],
