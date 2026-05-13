@@ -1624,7 +1624,8 @@ class SaveImage:
             },
         }
 
-    RETURN_TYPES = ()
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("images",)
     FUNCTION = "save_images"
 
     OUTPUT_NODE = True
@@ -1660,7 +1661,7 @@ class SaveImage:
             })
             counter += 1
 
-        return { "ui": { "images": results } }
+        return { "ui": { "images": results }, "result" : (images,) }
 
 class PreviewImage(SaveImage):
     def __init__(self):
