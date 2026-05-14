@@ -104,7 +104,7 @@ def vae_decode_audio(vae, samples, tile=None, overlap=None):
     std = torch.std(audio, dim=[1, 2], keepdim=True) * 5.0
     std[std < 1.0] = 1.0
     audio /= std
-    vae_sample_rate = getattr(vae, "audio_sample_rate", 44100)
+    vae_sample_rate = getattr(vae, "audio_sample_rate_output", getattr(vae, "audio_sample_rate", 44100))
     return {"waveform": audio, "sample_rate": vae_sample_rate if "sample_rate" not in samples else samples["sample_rate"]}
 
 
@@ -297,6 +297,7 @@ class LoadAudio(IO.ComfyNode):
     @classmethod
     def define_schema(cls):
         input_dir = folder_paths.get_input_directory()
+        os.makedirs(input_dir, exist_ok=True)
         files = folder_paths.filter_files_content_types(os.listdir(input_dir), ["audio", "video"])
         return IO.Schema(
             node_id="LoadAudio",
