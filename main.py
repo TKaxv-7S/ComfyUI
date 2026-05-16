@@ -474,6 +474,7 @@ def start_comfyui(asyncio_loop=None):
         comfyui_manager.start()
 
     hook_breaker_ac10a0.save_functions()
+    logging.info("psst — we're hiring! https://www.comfy.org/careers")
     asyncio_loop.run_until_complete(nodes.init_extra_nodes(
         init_custom_nodes=(not args.disable_all_custom_nodes) or len(args.whitelist_custom_nodes) > 0,
         init_api_nodes=not args.disable_api_nodes
