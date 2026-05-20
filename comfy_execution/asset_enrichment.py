@@ -40,7 +40,15 @@ def enrich_output_with_assets(output_ui: dict) -> dict:
                 if base is None:
                     new_entries.append(entry)
                     continue
-                abs_path = os.path.abspath(os.path.join(base, entry.get("subfolder", ""), entry["filename"]))
+                base_abs = os.path.abspath(base)
+                abs_path = os.path.abspath(os.path.join(base_abs, entry.get("subfolder") or "", entry["filename"]))
+                try:
+                    if os.path.commonpath([base_abs, abs_path]) != base_abs:
+                        raise ValueError("escapes base")
+                except ValueError:
+                    logging.warning("Asset enrichment skipped (path escapes base): %s", entry.get("filename"))
+                    new_entries.append(entry)
+                    continue
                 if not os.path.isfile(abs_path):
                     new_entries.append(entry)
                     continue

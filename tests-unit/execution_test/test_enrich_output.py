@@ -172,6 +172,70 @@ class TestEnrichOutputWithAssets(unittest.TestCase):
         self.assertIsNone(result["images"][0])
         self.assertIn("id", result["images"][1])
 
+    def test_path_traversal_subfolder_skipped(self):
+        fake_session_cm = MagicMock()
+        fake_session_cm.__enter__ = MagicMock(return_value=MagicMock())
+        fake_session_cm.__exit__ = MagicMock(return_value=False)
+
+        register_mock = MagicMock(return_value=_make_register_result())
+        mocked_modules = {
+            "comfy.cli_args": MagicMock(args=_make_args(True)),
+            "folder_paths": MagicMock(get_directory_by_type=MagicMock(return_value="/output")),
+            "app.assets.services.ingest": MagicMock(
+                register_file_in_place=register_mock,
+                DependencyMissingError=type("DependencyMissingError", (Exception,), {}),
+            ),
+            "app.assets.database.queries.asset_reference": MagicMock(
+                get_reference_by_file_path=MagicMock(return_value=None),
+            ),
+            "app.database.db": MagicMock(create_session=MagicMock(return_value=fake_session_cm)),
+        }
+
+        output = {"images": [{"filename": "passwd", "subfolder": "../../etc", "type": "output"}]}
+
+        # Do NOT patch os.path.abspath — real resolution is required for the containment check.
+        with patch.dict("sys.modules", mocked_modules), \
+             patch("os.path.isfile", return_value=True):
+            import importlib
+            import comfy_execution.asset_enrichment as mod
+            importlib.reload(mod)
+            result = mod.enrich_output_with_assets(output)
+
+        self.assertNotIn("id", result["images"][0])
+        register_mock.assert_not_called()
+
+    def test_absolute_filename_skipped(self):
+        fake_session_cm = MagicMock()
+        fake_session_cm.__enter__ = MagicMock(return_value=MagicMock())
+        fake_session_cm.__exit__ = MagicMock(return_value=False)
+
+        register_mock = MagicMock(return_value=_make_register_result())
+        mocked_modules = {
+            "comfy.cli_args": MagicMock(args=_make_args(True)),
+            "folder_paths": MagicMock(get_directory_by_type=MagicMock(return_value="/output")),
+            "app.assets.services.ingest": MagicMock(
+                register_file_in_place=register_mock,
+                DependencyMissingError=type("DependencyMissingError", (Exception,), {}),
+            ),
+            "app.assets.database.queries.asset_reference": MagicMock(
+                get_reference_by_file_path=MagicMock(return_value=None),
+            ),
+            "app.database.db": MagicMock(create_session=MagicMock(return_value=fake_session_cm)),
+        }
+
+        # Absolute filename — os.path.join discards earlier components when a later one is absolute.
+        output = {"images": [{"filename": "/etc/passwd", "subfolder": "", "type": "output"}]}
+
+        with patch.dict("sys.modules", mocked_modules), \
+             patch("os.path.isfile", return_value=True):
+            import importlib
+            import comfy_execution.asset_enrichment as mod
+            importlib.reload(mod)
+            result = mod.enrich_output_with_assets(output)
+
+        self.assertNotIn("id", result["images"][0])
+        register_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
