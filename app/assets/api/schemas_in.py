@@ -95,10 +95,15 @@ class ListAssetsQuery(BaseModel):
         elif isinstance(v, list):
             raw = []
             for item in v:
-                if isinstance(item, str):
-                    raw.extend([t.strip() for t in item.split(",") if t.strip()])
+                if not isinstance(item, str):
+                    raise ValueError(
+                        f"job_ids entries must be strings, got {type(item).__name__}"
+                    )
+                raw.extend([t.strip() for t in item.split(",") if t.strip()])
         else:
-            return v
+            raise ValueError(
+                f"job_ids must be a string or list of strings, got {type(v).__name__}"
+            )
 
         out: list[str] = []
         seen: set[str] = set()
