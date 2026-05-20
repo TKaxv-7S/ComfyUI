@@ -1,4 +1,5 @@
 import json
+import uuid
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -53,6 +54,7 @@ class ListAssetsQuery(BaseModel):
     include_tags: list[str] = Field(default_factory=list)
     exclude_tags: list[str] = Field(default_factory=list)
     name_contains: str | None = None
+    job_ids: list[str] = Field(default_factory=list)
 
     # Accept either a JSON string (query param) or a dict
     metadata_filter: dict[str, Any] | None = None
@@ -80,6 +82,35 @@ class ListAssetsQuery(BaseModel):
                     out.extend([t.strip() for t in item.split(",") if t.strip()])
             return out
         return v
+
+    @field_validator("job_ids", mode="before")
+    @classmethod
+    def _split_and_validate_job_ids(cls, v):
+        # Accept "uuid1,uuid2" or ["uuid1","uuid2"] or repeated query params.
+        # Each entry must parse as a UUID; canonicalized to lowercase hyphenated form.
+        if v is None:
+            return []
+        if isinstance(v, str):
+            raw = [t.strip() for t in v.split(",") if t.strip()]
+        elif isinstance(v, list):
+            raw = []
+            for item in v:
+                if isinstance(item, str):
+                    raw.extend([t.strip() for t in item.split(",") if t.strip()])
+        else:
+            return v
+
+        out: list[str] = []
+        seen: set[str] = set()
+        for s in raw:
+            try:
+                canonical = str(uuid.UUID(s))
+            except (ValueError, AttributeError) as e:
+                raise ValueError(f"job_ids must be UUIDs: {s!r}") from e
+            if canonical not in seen:
+                seen.add(canonical)
+                out.append(canonical)
+        return out
 
     @field_validator("metadata_filter", mode="before")
     @classmethod

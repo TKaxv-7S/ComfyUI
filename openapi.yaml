@@ -1560,8 +1560,7 @@ paths:
           in: query
           schema:
             type: string
-          x-runtime: [cloud]
-          description: "[cloud-only] Comma-separated UUIDs to filter assets by associated job."
+          description: "Comma-separated UUIDs to filter assets by associated job."
         - name: include_public
           in: query
           schema:
