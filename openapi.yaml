@@ -6338,7 +6338,7 @@ components:
           type: string
           nullable: true
           x-runtime: [cloud, local]
-          description: "Path under the asset's category or root, for human-facing labels."
+          description: "Human-facing display label for the asset. Not a unique reference key; use `id` for identity."
         hash:
           type: string
           nullable: true
