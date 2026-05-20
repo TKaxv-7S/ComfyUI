@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, TypedDict
 
 from sqlalchemy.orm import Session
@@ -233,13 +233,19 @@ def batch_insert_seed_assets(
             if ref_id not in inserted_ref_ids:
                 continue
 
-            for tag in ref_data["tags"]:
+            # Stagger added_at by microsecond per tag within a reference so
+            # the retrieval ORDER BY added_at preserves the input list order
+            # (the path-derived root category stays at position 0). Without
+            # this, every tag in a bulk-insert batch shares current_time and
+            # the tag_name tiebreaker sorts them alphabetically — putting the
+            # subpath tag ahead of "models" since "c"/"d"/"l" < "m".
+            for tag_idx, tag in enumerate(ref_data["tags"]):
                 tag_rows.append(
                     {
                         "asset_reference_id": ref_id,
                         "tag_name": tag,
                         "origin": "automatic",
-                        "added_at": current_time,
+                        "added_at": current_time + timedelta(microseconds=tag_idx),
                     }
                 )
 
