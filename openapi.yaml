@@ -6328,6 +6328,7 @@ components:
           description: Unique identifier for the asset
         name:
           type: string
+          deprecated: true
           description: Name of the asset file
         file_path:
           type: string
