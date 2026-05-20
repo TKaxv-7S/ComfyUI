@@ -10,6 +10,8 @@ class Asset(BaseModel):
 
     id: str
     name: str
+    file_path: str | None = None
+    display_name: str | None = None
     asset_hash: str | None = None
     size: int | None = None
     mime_type: str | None = None
