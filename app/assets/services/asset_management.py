@@ -1,7 +1,18 @@
 import contextlib
 import mimetypes
 import os
+from datetime import timezone
 from typing import Sequence
+
+from app.assets.services.cursor import (
+    CursorPayload,
+    InvalidCursorError,
+    decode_cursor,
+    decode_cursor_int,
+    decode_cursor_time,
+    encode_cursor,
+    encode_cursor_from_time,
+)
 
 
 from app.assets.database.models import Asset
@@ -242,6 +253,12 @@ def get_asset_by_hash(asset_hash: str) -> AssetData | None:
         return extract_asset_data(asset)
 
 
+# Sort fields that support cursor pagination. Mirrors cloud's allowlist
+# (created_at, updated_at, name, size). `last_access_time` is OSS-only and
+# falls back to offset/limit — no cloud contract to match.
+_CURSOR_SORT_FIELDS = ("created_at", "updated_at", "name", "size")
+
+
 def list_assets_page(
     owner_id: str = "",
     include_tags: Sequence[str] | None = None,
@@ -252,7 +269,30 @@ def list_assets_page(
     offset: int = 0,
     sort: str = "created_at",
     order: str = "desc",
+    after: str | None = None,
 ) -> ListAssetsResult:
+    """List assets with optional cursor pagination.
+
+    When ``after`` is supplied it overrides ``offset``. The cursor's sort field
+    must match ``sort`` and be in the cursor-supported allowlist; mismatches
+    raise InvalidCursorError so the handler can map to 400 INVALID_CURSOR.
+    """
+    cursor_value: object | None = None
+    cursor_id: str | None = None
+    use_cursor_mode = after is not None and sort in _CURSOR_SORT_FIELDS
+
+    if after is not None:
+        if sort not in _CURSOR_SORT_FIELDS:
+            raise InvalidCursorError(
+                f"cursor pagination is not supported for sort={sort!r}"
+            )
+        payload = decode_cursor(after, _CURSOR_SORT_FIELDS)
+        if payload.sort_field != sort:
+            raise InvalidCursorError(
+                f"cursor sort field {payload.sort_field!r} does not match request sort {sort!r}"
+            )
+        cursor_value, cursor_id = _resolve_cursor_value(payload), payload.id
+
     with create_session() as session:
         refs, tag_map, total = list_references_page(
             session,
@@ -265,6 +305,8 @@ def list_assets_page(
             offset=offset,
             sort=sort,
             order=order,
+            after_cursor_value=cursor_value,
+            after_cursor_id=cursor_id,
         )
 
         items: list[AssetSummaryData] = []
@@ -277,7 +319,34 @@ def list_assets_page(
                 )
             )
 
-        return ListAssetsResult(items=items, total=total)
+        next_cursor: str | None = None
+        if use_cursor_mode and len(refs) == limit:
+            next_cursor = _encode_next_cursor(refs[-1], sort)
+
+        return ListAssetsResult(items=items, total=total, next_cursor=next_cursor)
+
+
+def _resolve_cursor_value(payload: CursorPayload) -> object:
+    """Map a decoded cursor payload to a column-typed Python value."""
+    if payload.sort_field in ("created_at", "updated_at"):
+        # DB stores naive UTC; strip tzinfo so the comparison binds against a
+        # `TIMESTAMP WITHOUT TIME ZONE` column without an offset shift.
+        return decode_cursor_time(payload).replace(tzinfo=None)
+    if payload.sort_field == "size":
+        return decode_cursor_int(payload)
+    return payload.value  # name, str-typed
+
+
+def _encode_next_cursor(ref, sort: str) -> str:
+    """Mint a cursor pointing at *ref* for the given sort dimension."""
+    if sort == "name":
+        return encode_cursor("name", ref.name, ref.id)
+    if sort == "size":
+        size = ref.asset.size_bytes if ref.asset is not None else 0
+        return encode_cursor("size", str(size), ref.id)
+    # created_at / updated_at — DB datetimes are naive UTC; attach tz before encoding.
+    value = ref.created_at if sort == "created_at" else ref.updated_at
+    return encode_cursor_from_time(sort, value.replace(tzinfo=timezone.utc), ref.id)
 
 
 def resolve_hash_to_path(
