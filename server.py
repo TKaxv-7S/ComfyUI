@@ -252,6 +252,9 @@ class PromptServer():
         self.last_node_id = None
         self.client_id = None
 
+        # Opaque tag dict pinned by main.py around each prompt; send_sync spreads it.
+        self.active_prompt_metadata: Optional[dict] = None
+
         self.on_prompt_handlers = []
 
         @routes.get('/ws')
@@ -275,7 +278,13 @@ class PromptServer():
                 await self.send("status", {"status": self.get_queue_info(), "sid": sid}, sid)
                 # On reconnect if we are the currently executing client send the current node
                 if self.client_id == sid and self.last_node_id is not None:
-                    await self.send("executing", { "node": self.last_node_id }, sid)
+                    payload = {"node": self.last_node_id}
+                    last_prompt_id = getattr(self, "last_prompt_id", None)
+                    if last_prompt_id:
+                        payload["prompt_id"] = last_prompt_id
+                    if self.active_prompt_metadata:
+                        payload = {**self.active_prompt_metadata, **payload}
+                    await self.send("executing", payload, sid)
 
                 # Flag to track if we've received the first message
                 first_message = True
@@ -955,7 +964,9 @@ class PromptServer():
                         if sensitive_val in extra_data:
                             sensitive[sensitive_val] = extra_data.pop(sensitive_val)
                     extra_data["create_time"] = int(time.time() * 1000)  # timestamp in milliseconds
-                    self.prompt_queue.put((number, prompt_id, prompt, extra_data, outputs_to_execute, sensitive))
+                    raw_metadata = extra_data.pop("metadata", None)
+                    client_metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
+                    self.prompt_queue.put((number, prompt_id, prompt, extra_data, outputs_to_execute, sensitive, client_metadata))
                     response = {"prompt_id": prompt_id, "number": number, "node_errors": valid[3]}
                     return web.json_response(response)
                 else:
@@ -1217,6 +1228,9 @@ class PromptServer():
             await send_socket_catch_exception(self.sockets[sid].send_json, message)
 
     def send_sync(self, event, data, sid=None):
+        meta = self.active_prompt_metadata
+        if meta and isinstance(data, dict):
+            data = {**meta, **data}
         self.loop.call_soon_threadsafe(
             self.messages.put_nowait, (event, data, sid))
 

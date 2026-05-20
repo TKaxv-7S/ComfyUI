@@ -317,20 +317,28 @@ def prompt_worker(q, server_instance):
             for k in sensitive:
                 extra_data[k] = sensitive[k]
 
+            metadata = item[6] if len(item) > 6 and isinstance(item[6], dict) else None
+            server_instance.active_prompt_metadata = metadata
+
             asset_seeder.pause()
-            e.execute(item[2], prompt_id, extra_data, item[4])
+            try:
+                e.execute(item[2], prompt_id, extra_data, item[4])
 
-            need_gc = True
+                need_gc = True
 
-            remove_sensitive = lambda prompt: prompt[:5] + prompt[6:]
-            q.task_done(item_id,
-                        e.history_result,
-                        status=execution.PromptQueue.ExecutionStatus(
-                            status_str='success' if e.success else 'error',
-                            completed=e.success,
-                            messages=e.status_messages), process_item=remove_sensitive)
-            if server_instance.client_id is not None:
-                server_instance.send_sync("executing", {"node": None, "prompt_id": prompt_id}, server_instance.client_id)
+                # Drop sensitive (index 5) and metadata (index 6); history keeps a 5-tuple.
+                remove_sensitive = lambda prompt: prompt[:5]
+                q.task_done(item_id,
+                            e.history_result,
+                            status=execution.PromptQueue.ExecutionStatus(
+                                status_str='success' if e.success else 'error',
+                                completed=e.success,
+                                messages=e.status_messages), process_item=remove_sensitive)
+                if server_instance.client_id is not None:
+                    server_instance.send_sync("executing", {"node": None, "prompt_id": prompt_id}, server_instance.client_id)
+            finally:
+                # Clear after the terminal send so that frame still carries metadata.
+                server_instance.active_prompt_metadata = None
 
             current_time = time.perf_counter()
             execution_time = current_time - execution_start_time
