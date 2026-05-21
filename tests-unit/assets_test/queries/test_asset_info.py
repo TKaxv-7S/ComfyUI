@@ -239,6 +239,44 @@ class TestTagRetrievalOrder:
         assert tags[0:2] == ["models", "checkpoints"]
         assert set(tags[2:]) == {"zzz-z", "favorite", "experiment-q4"}
 
+    def test_user_batch_lands_after_path_batch_under_clock_collision(
+        self, session: Session, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Windows-specific race: when two back-to-back commits share the
+        same datetime.now() microsecond, the path-tier and user-tier
+        added_at values used to collide and alphabetic tiebreak would
+        hoist user tags ahead of path tags. The fix reads
+        max(existing_added_at) for the reference and seeds the next batch
+        past it, deterministically restoring insertion order.
+
+        This test simulates the collision by pinning get_utc_now() so the
+        platform-dependent race becomes a platform-independent failure.
+        """
+        ref = self._make_ref(session)
+
+        from datetime import datetime
+        from app.assets.database import queries as queries_pkg
+        from app.assets.database.queries import tags as tags_module
+
+        frozen = datetime(2026, 1, 1, 0, 0, 0)
+        monkeypatch.setattr(tags_module, "get_utc_now", lambda: frozen)
+        monkeypatch.setattr(queries_pkg, "get_utc_now", lambda: frozen, raising=False)
+
+        set_reference_tags(session, reference_id=ref.id, tags=["models", "checkpoints"])
+        session.commit()
+
+        # Same frozen timestamp — without the max(existing) seed, the
+        # user batch would share added_at with the path batch and
+        # `aaa-user-tag` would sort to position 0 via the alphabetic
+        # tiebreaker.
+        add_tags_to_reference(
+            session, reference_id=ref.id, tags=["aaa-user-tag"], origin="manual"
+        )
+        session.commit()
+
+        _, tag_map, _ = list_references_page(session)
+        assert tag_map[ref.id] == ["models", "checkpoints", "aaa-user-tag"]
+
     def test_remove_then_add_does_not_disrupt_path_tag_positions(
         self, session: Session
     ):

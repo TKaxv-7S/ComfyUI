@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Iterable, Sequence
 
 import sqlalchemy as sa
@@ -48,6 +48,26 @@ class SetTagsResult:
     added: list[str]
     removed: list[str]
     total: list[str]
+
+
+def _next_added_at_base(session: Session, reference_id: str) -> datetime:
+    """Return a timestamp strictly greater than any existing
+    `added_at` for this reference. On platforms where the wall clock
+    has insufficient resolution between back-to-back commits (notably
+    Windows), two write batches on the same reference can otherwise
+    share a microsecond — the `ORDER BY added_at, tag_name` retrieval
+    then falls back to the alphabetic tiebreaker and user-tier tags
+    sort ahead of path-tier tags they were meant to follow.
+    """
+    existing_max = session.execute(
+        sa.select(sa.func.max(AssetReferenceTag.added_at)).where(
+            AssetReferenceTag.asset_reference_id == reference_id
+        )
+    ).scalar()
+    now = get_utc_now()
+    if existing_max is None:
+        return now
+    return max(existing_max + timedelta(microseconds=1), now)
 
 
 def validate_tags_exist(session: Session, tags: list[str]) -> None:
@@ -114,8 +134,9 @@ def set_reference_tags(
         # added_at preserves input order. Per-tag get_utc_now() calls can
         # collide at microsecond resolution on fast machines, dropping the
         # query to the tag_name alphabetical tiebreaker — same fix as in
-        # batch_insert_seed_assets.
-        base_ts = get_utc_now()
+        # batch_insert_seed_assets. Read max(existing) so this batch sorts
+        # strictly after any prior batch on the same reference.
+        base_ts = _next_added_at_base(session, reference_id)
         session.add_all(
             [
                 AssetReferenceTag(
@@ -172,8 +193,9 @@ def add_tags_to_reference(
     to_add = [t for t in norm if t not in current]
 
     if to_add:
-        # See set_reference_tags for the rationale behind the per-tag stagger.
-        base_ts = get_utc_now()
+        # See set_reference_tags for the rationale behind the per-tag stagger
+        # and the max(existing) seed.
+        base_ts = _next_added_at_base(session, reference_id)
         with session.begin_nested() as nested:
             try:
                 session.add_all(
