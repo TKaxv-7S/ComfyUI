@@ -69,7 +69,7 @@ def on_flush(callback):
     if stderr_interceptor is not None:
         stderr_interceptor.on_flush(callback)
 
-def setup_logger(log_level: str = 'INFO', capacity: int = 300, use_stdout: bool = False, color_logs: bool = False):
+def setup_logger(log_level: str = 'INFO', capacity: int = 300, use_stdout: bool = False, color_logs: bool = True):
     global logs
     if logs:
         return
