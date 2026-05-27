@@ -6758,6 +6758,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
           description: The secret ID.
       responses:
         "204":
