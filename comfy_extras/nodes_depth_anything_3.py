@@ -149,7 +149,7 @@ class LoadDA3Model(io.ComfyNode):
         return io.Schema(
             node_id="LoadDA3Model",
             display_name="Load Depth Anything 3",
-            category="loaders",
+            category="model/loaders",
             inputs=[
                 io.Combo.Input(
                     "model_name",
@@ -232,7 +232,7 @@ class DA3Inference(io.ComfyNode):
             node_id="DA3Inference",
             search_aliases=["depth", "geometry", "da3", "depth anything", "monocular", "pointmap", "sky", "3d", "metric depth", "disparity"],
             display_name="Run Depth Anything 3",
-            category="image/geometry_estimation",
+            category="image/geometry estimation",
             description="Run Depth Anything 3 on an image. In multi-view mode each image is treated as a separate view of the same scene.",
             inputs=[
                 DA3ModelType.Input("da3_model"),
@@ -418,7 +418,7 @@ class DA3Render(io.ComfyNode):
         return io.Schema(
             node_id="DA3Render",
             display_name="Render Depth Anything 3",
-            category="image/geometry_estimation",
+            category="image/geometry estimation",
             description="Render a depth map, confidence map, or sky mask from DA3 geometry data.",
             inputs=[
                 DA3Geometry.Input("da3_geometry"),
@@ -521,7 +521,7 @@ class DA3GeometryToMesh(io.ComfyNode):
             node_id="DA3GeometryToMesh",
             search_aliases=["da3", "depth anything", "mesh", "geometry", "3d", "triangulate"],
             display_name="Convert DA3 Geometry to Mesh",
-            category="image/geometry_estimation",
+            category="image/geometry estimation",
             description="Convert a depth map into a triangulated 3D mesh.",
             inputs=[
                 DA3Geometry.Input("da3_geometry"),
@@ -623,7 +623,7 @@ class DA3GeometryToPointCloud(io.ComfyNode):
             node_id="DA3GeometryToPointCloud",
             search_aliases=["da3", "depth anything", "point cloud", "pointcloud", "3d", "geometry"],
             display_name="Convert DA3 Geometry to Point Cloud",
-            category="image/geometry_estimation",
+            category="image/geometry estimation",
             description="Convert a depth map into a 3D point cloud.",
             inputs=[
                 DA3Geometry.Input("da3_geometry"),
