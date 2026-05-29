@@ -779,19 +779,13 @@ class Load3DCamera(ComfyTypeIO):
 
 @comfytype(io_type="LOAD3D_MODEL_INFO")
 class Load3DModelInfo(ComfyTypeIO):
-    class ModelTransform(TypedDict):
-        uuid: str
-        name: str
-        type: str
-        position: dict[str, float | int]
-        rotation: dict[str, float | int | str]
-        quaternion: dict[str, float | int]
-        scale: dict[str, float | int]
-        up: dict[str, float | int]
-        visible: bool
-        matrix: list[float]
+    class Model3DTransform(TypedDict):
+        # Coordinate system: right-handed, Y-up, world space
+        position: dict[str, float | int]  # scene units
+        quaternion: dict[str, float | int]  # normalized, dimensionless; world rotation
+        scale: dict[str, float | int]  # dimensionless multiplier
 
-    Type = list[ModelTransform]
+    Type = list[Model3DTransform]
 
 
 @comfytype(io_type="LOAD_3D")
@@ -803,7 +797,7 @@ class Load3D(ComfyTypeIO):
         normal: str
         camera_info: Load3DCamera.CameraInfo
         recording: NotRequired[str]
-        model_info: NotRequired[list[Load3DModelInfo.ModelTransform]]
+        model_3d_info: NotRequired[list[Load3DModelInfo.Model3DTransform]]
 
     Type = Model3DDict
 
