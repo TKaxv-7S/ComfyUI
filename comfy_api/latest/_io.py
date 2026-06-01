@@ -1090,7 +1090,7 @@ class Autogrow(ComfyTypeI):
             self.template.validate()
 
     @staticmethod
-    def _expand_schema_for_dynamic(out_dict: dict[str, Any], live_inputs: dict[str, Any], value: tuple[str, dict[str, Any]], input_type: str, curr_prefix: list[str] | None):
+    def _expand_schema_for_dynamic(out_dict: dict[str, Any], live_inputs: dict[str, Any], value: tuple[str, dict[str, Any]], input_type: str, curr_prefix: list[str] | None, live_input_types: dict[str, str] | None = None):
         # NOTE: purposely do not include self in out_dict; instead use only the template inputs
         # need to figure out names based on template type
         is_names = ("names" in value[1]["template"])
@@ -1139,7 +1139,7 @@ class Autogrow(ComfyTypeI):
             finalized_prefix = finalize_prefix(curr_prefix)
             out_dict["dynamic_paths"][finalized_prefix] = finalized_prefix
             out_dict["dynamic_paths_default_value"][finalized_prefix] = DynamicPathsDefaultValue.EMPTY_DICT
-        parse_class_inputs(out_dict, live_inputs, new_dict, curr_prefix)
+        parse_class_inputs(out_dict, live_inputs, new_dict, curr_prefix, live_input_types)
 
 @comfytype(io_type="COMFY_DYNAMICCOMBO_V3")
 class DynamicCombo(ComfyTypeI):
@@ -1177,7 +1177,7 @@ class DynamicCombo(ComfyTypeI):
                     input.validate()
 
     @staticmethod
-    def _expand_schema_for_dynamic(out_dict: dict[str, Any], live_inputs: dict[str, Any], value: tuple[str, dict[str, Any]], input_type: str, curr_prefix: list[str] | None):
+    def _expand_schema_for_dynamic(out_dict: dict[str, Any], live_inputs: dict[str, Any], value: tuple[str, dict[str, Any]], input_type: str, curr_prefix: list[str] | None, live_input_types: dict[str, str] | None = None):
         finalized_id = finalize_prefix(curr_prefix)
         if finalized_id in live_inputs:
             key = live_inputs[finalized_id]
@@ -1189,7 +1189,7 @@ class DynamicCombo(ComfyTypeI):
                     selected_option = option
                     break
             if selected_option is not None:
-                parse_class_inputs(out_dict, live_inputs, selected_option["inputs"], curr_prefix)
+                parse_class_inputs(out_dict, live_inputs, selected_option["inputs"], curr_prefix, live_input_types)
                 # add self to inputs
                 out_dict[input_type][finalized_id] = value
                 out_dict["dynamic_paths"][finalized_id] = finalize_prefix(curr_prefix, curr_prefix[-1])
@@ -1232,11 +1232,11 @@ class DynamicSlot(ComfyTypeI):
                 input.validate()
 
     @staticmethod
-    def _expand_schema_for_dynamic(out_dict: dict[str, Any], live_inputs: dict[str, Any], value: tuple[str, dict[str, Any]], input_type: str, curr_prefix: list[str] | None):
+    def _expand_schema_for_dynamic(out_dict: dict[str, Any], live_inputs: dict[str, Any], value: tuple[str, dict[str, Any]], input_type: str, curr_prefix: list[str] | None, live_input_types: dict[str, str] | None = None):
         finalized_id = finalize_prefix(curr_prefix)
         if finalized_id in live_inputs:
             inputs = value[1]["inputs"]
-            parse_class_inputs(out_dict, live_inputs, inputs, curr_prefix)
+            parse_class_inputs(out_dict, live_inputs, inputs, curr_prefix, live_input_types)
             # add self to inputs
             out_dict[input_type][finalized_id] = value
             out_dict["dynamic_paths"][finalized_id] = finalize_prefix(curr_prefix, curr_prefix[-1])
@@ -1357,11 +1357,21 @@ class Range(ComfyTypeIO):
             })
 
 
-DYNAMIC_INPUT_LOOKUP: dict[str, Callable[[dict[str, Any], dict[str, Any], tuple[str, dict[str, Any]], str, list[str] | None], None]] = {}
-def register_dynamic_input_func(io_type: str, func: Callable[[dict[str, Any], dict[str, Any], tuple[str, dict[str, Any]], str, list[str] | None], None]):
+# Signature: (out_dict, live_inputs, value, input_type, curr_prefix, live_input_types)
+#   live_input_types is an optional {input_id: resolved_io_type} dict produced
+#   by comfy_execution.type_resolver.TypeResolver. Existing dynamic-input
+#   implementations may ignore it; future type-discriminated dynamic inputs
+#   (e.g. a per-connected-type variant of DynamicCombo) use it as their
+#   discriminator instead of literal live_inputs values.
+_DynamicInputFunc = Callable[
+    [dict[str, Any], dict[str, Any], tuple[str, dict[str, Any]], str, list[str] | None, dict[str, str] | None],
+    None,
+]
+DYNAMIC_INPUT_LOOKUP: dict[str, _DynamicInputFunc] = {}
+def register_dynamic_input_func(io_type: str, func: _DynamicInputFunc):
     DYNAMIC_INPUT_LOOKUP[io_type] = func
 
-def get_dynamic_input_func(io_type: str) -> Callable[[dict[str, Any], dict[str, Any], tuple[str, dict[str, Any]], str, list[str] | None], None]:
+def get_dynamic_input_func(io_type: str) -> _DynamicInputFunc:
     return DYNAMIC_INPUT_LOOKUP[io_type]
 
 def setup_dynamic_input_funcs():
@@ -1709,7 +1719,19 @@ class Schema:
         )
         return info
 
-def get_finalized_class_inputs(d: dict[str, Any], live_inputs: dict[str, Any], include_hidden=False) -> tuple[dict[str, Any], V3Data]:
+def get_finalized_class_inputs(d: dict[str, Any], live_inputs: dict[str, Any], include_hidden=False, live_input_types: dict[str, str] | None = None) -> tuple[dict[str, Any], V3Data]:
+    """Expand a node's V3 schema against a concrete prompt.
+
+    Args:
+        d: ``INPUT_TYPES()``-shaped dict for the node.
+        live_inputs: Concrete ``{input_id: value}`` map from the prompt
+            (values may be links ``[node_id, slot_idx]`` or literals).
+        include_hidden: When True, retain hidden inputs in the returned dict.
+        live_input_types: Optional ``{input_id: resolved_io_type}`` map
+            produced by ``comfy_execution.type_resolver.TypeResolver``. Future
+            dynamic-input strategies that branch on connected type use this as
+            their discriminator. Existing dynamic types ignore it.
+    """
     out_dict = {
         "required": {},
         "optional": {},
@@ -1719,7 +1741,7 @@ def get_finalized_class_inputs(d: dict[str, Any], live_inputs: dict[str, Any], i
     d = d.copy()
     # ignore hidden for parsing
     hidden = d.pop("hidden", None)
-    parse_class_inputs(out_dict, live_inputs, d)
+    parse_class_inputs(out_dict, live_inputs, d, None, live_input_types)
     if hidden is not None and include_hidden:
         out_dict["hidden"] = hidden
     v3_data = {}
@@ -1732,7 +1754,7 @@ def get_finalized_class_inputs(d: dict[str, Any], live_inputs: dict[str, Any], i
         v3_data["dynamic_paths_default_value"] = dynamic_paths_default_value
     return out_dict, hidden, v3_data
 
-def parse_class_inputs(out_dict: dict[str, Any], live_inputs: dict[str, Any], curr_dict: dict[str, Any], curr_prefix: list[str] | None=None) -> None:
+def parse_class_inputs(out_dict: dict[str, Any], live_inputs: dict[str, Any], curr_dict: dict[str, Any], curr_prefix: list[str] | None=None, live_input_types: dict[str, str] | None = None) -> None:
     for input_type, inner_d in curr_dict.items():
         for id, value in inner_d.items():
             io_type = value[0]
@@ -1740,7 +1762,7 @@ def parse_class_inputs(out_dict: dict[str, Any], live_inputs: dict[str, Any], cu
                 # dynamic inputs need to be handled with lookup functions
                 dynamic_input_func = get_dynamic_input_func(io_type)
                 new_prefix = handle_prefix(curr_prefix, id)
-                dynamic_input_func(out_dict, live_inputs, value, input_type, new_prefix)
+                dynamic_input_func(out_dict, live_inputs, value, input_type, new_prefix, live_input_types)
             else:
                 # non-dynamic inputs get directly transferred
                 finalized_id = finalize_prefix(curr_prefix, id)
