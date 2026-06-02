@@ -136,7 +136,7 @@ class Preview3DAdvanced(IO.ComfyNode):
             is_output_node=True,
             inputs=[
                 IO.MultiType.Input(
-                    "model_file",
+                    "model_3d",
                     types=[
                         IO.File3DGLB,
                         IO.File3DGLTF,
@@ -155,7 +155,7 @@ class Preview3DAdvanced(IO.ComfyNode):
                 IO.Int.Input("height", default=1024, min=1, max=4096, step=1),
             ],
             outputs=[
-                IO.File3DAny.Output(display_name="model_file"),
+                IO.File3DAny.Output(display_name="model_3d"),
                 IO.Load3DCamera.Output(display_name="camera_info"),
                 IO.Load3DModelInfo.Output(display_name="model_3d_info"),
                 IO.Int.Output(display_name="width"),
@@ -164,16 +164,16 @@ class Preview3DAdvanced(IO.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, model_file: Types.File3D, image, width: int, height: int, **kwargs) -> IO.NodeOutput:
-        filename = f"preview3d_advanced_{uuid.uuid4().hex}.{model_file.format}"
-        model_file.save_to(os.path.join(folder_paths.get_output_directory(), filename))
+    def execute(cls, model_3d: Types.File3D, image, width: int, height: int, **kwargs) -> IO.NodeOutput:
+        filename = f"preview3d_advanced_{uuid.uuid4().hex}.{model_3d.format}"
+        model_3d.save_to(os.path.join(folder_paths.get_output_directory(), filename))
 
         camera_info_input = kwargs.get("camera_info", None)
         camera_info = camera_info_input if camera_info_input is not None else image['camera_info']
         model_3d_info_input = kwargs.get("model_3d_info", None)
         model_3d_info = model_3d_info_input if model_3d_info_input is not None else image.get('model_3d_info', [])
         return IO.NodeOutput(
-            model_file,
+            model_3d,
             camera_info,
             model_3d_info,
             width,
@@ -187,7 +187,7 @@ class PreviewGaussianSplat(IO.ComfyNode):
     def define_schema(cls):
         return IO.Schema(
             node_id="PreviewGaussianSplat",
-            display_name="Preview Gaussian Splat",
+            display_name="Preview Splat",
             category="3d",
             is_experimental=True,
             is_output_node=True,
@@ -206,7 +206,7 @@ class PreviewGaussianSplat(IO.ComfyNode):
             ],
             inputs=[
                 IO.MultiType.Input(
-                    "model_file",
+                    "model_3d",
                     types=[
                         IO.File3DSplatAny,
                         IO.File3DPLY,
@@ -214,7 +214,7 @@ class PreviewGaussianSplat(IO.ComfyNode):
                         IO.File3DSPZ,
                         IO.File3DKSPLAT,
                     ],
-                    tooltip="3D Gaussian splat file (.ply / .spz / .splat / .ksplat)",
+                    tooltip="A gaussian splat 3D file.",
                 ),
                 IO.Load3D.Input("image"),
                 IO.Load3DCamera.Input("camera_info", optional=True, advanced=True),
@@ -223,7 +223,7 @@ class PreviewGaussianSplat(IO.ComfyNode):
                 IO.Int.Input("height", default=1024, min=1, max=4096, step=1),
             ],
             outputs=[
-                IO.File3DSplatAny.Output(display_name="model_file"),
+                IO.File3DSplatAny.Output(display_name="model_3d"),
                 IO.Load3DCamera.Output(display_name="camera_info"),
                 IO.Load3DModelInfo.Output(display_name="model_3d_info"),
                 IO.Int.Output(display_name="width"),
@@ -232,16 +232,16 @@ class PreviewGaussianSplat(IO.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, model_file: Types.File3D, image, width: int, height: int, **kwargs) -> IO.NodeOutput:
-        filename = f"preview_splat_{uuid.uuid4().hex}.{model_file.format}"
-        model_file.save_to(os.path.join(folder_paths.get_output_directory(), filename))
+    def execute(cls, model_3d: Types.File3D, image, width: int, height: int, **kwargs) -> IO.NodeOutput:
+        filename = f"preview_splat_{uuid.uuid4().hex}.{model_3d.format}"
+        model_3d.save_to(os.path.join(folder_paths.get_output_directory(), filename))
 
         camera_info_input = kwargs.get("camera_info", None)
         camera_info = camera_info_input if camera_info_input is not None else image['camera_info']
         model_3d_info_input = kwargs.get("model_3d_info", None)
         model_3d_info = model_3d_info_input if model_3d_info_input is not None else image.get('model_3d_info', [])
         return IO.NodeOutput(
-            model_file,
+            model_3d,
             camera_info,
             model_3d_info,
             width,
@@ -268,7 +268,7 @@ class PreviewPointCloud(IO.ComfyNode):
             ],
             inputs=[
                 IO.MultiType.Input(
-                    "model_file",
+                    "model_3d",
                     types=[
                         IO.File3DPointCloudAny,
                         IO.File3DPLY,
@@ -282,7 +282,7 @@ class PreviewPointCloud(IO.ComfyNode):
                 IO.Int.Input("height", default=1024, min=1, max=4096, step=1),
             ],
             outputs=[
-                IO.File3DPointCloudAny.Output(display_name="model_file"),
+                IO.File3DPointCloudAny.Output(display_name="model_3d"),
                 IO.Load3DCamera.Output(display_name="camera_info"),
                 IO.Load3DModelInfo.Output(display_name="model_3d_info"),
                 IO.Int.Output(display_name="width"),
@@ -291,16 +291,16 @@ class PreviewPointCloud(IO.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, model_file: Types.File3D, image, width: int, height: int, **kwargs) -> IO.NodeOutput:
-        filename = f"preview_pointcloud_{uuid.uuid4().hex}.{model_file.format}"
-        model_file.save_to(os.path.join(folder_paths.get_output_directory(), filename))
+    def execute(cls, model_3d: Types.File3D, image, width: int, height: int, **kwargs) -> IO.NodeOutput:
+        filename = f"preview_pointcloud_{uuid.uuid4().hex}.{model_3d.format}"
+        model_3d.save_to(os.path.join(folder_paths.get_output_directory(), filename))
 
         camera_info_input = kwargs.get("camera_info", None)
         camera_info = camera_info_input if camera_info_input is not None else image['camera_info']
         model_3d_info_input = kwargs.get("model_3d_info", None)
         model_3d_info = model_3d_info_input if model_3d_info_input is not None else image.get('model_3d_info', [])
         return IO.NodeOutput(
-            model_file,
+            model_3d,
             camera_info,
             model_3d_info,
             width,
