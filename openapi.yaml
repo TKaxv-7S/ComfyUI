@@ -1783,7 +1783,7 @@ paths:
             description: |
                 Updates an asset's metadata. At least one field must be provided.
                 Only name, mime_type, preview_id, and user_metadata can be updated.
-                For tag management, use the dedicated PUT /api/assets/{id}/tags endpoint.
+                For tag management, use POST (add) and DELETE (remove) /api/assets/{id}/tags.
             operationId: updateAsset
             parameters:
                 - description: Asset ID
@@ -1980,76 +1980,6 @@ paths:
                                 $ref: '#/components/schemas/ErrorResponse'
                     description: Internal server error
             summary: Add tags to asset
-            tags:
-                - file
-        put:
-            description: Adds and removes tags from an asset in a single operation
-            operationId: updateAssetTags
-            parameters:
-                - description: Asset ID
-                  in: path
-                  name: id
-                  required: true
-                  schema:
-                    format: uuid
-                    type: string
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            description: At least one of add or remove must contain items. Empty arrays are allowed when the other array has items.
-                            minProperties: 1
-                            properties:
-                                add:
-                                    description: Tags to add to the asset. Can be empty if remove has items.
-                                    items:
-                                        type: string
-                                    type: array
-                                remove:
-                                    description: Tags to remove from the asset. Can be empty if add has items.
-                                    items:
-                                        type: string
-                                    type: array
-                            type: object
-                required: true
-            responses:
-                "200":
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/TagsModificationResponse'
-                    description: Tags updated successfully
-                "400":
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ErrorResponse'
-                    description: Invalid request
-                "401":
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ErrorResponse'
-                    description: Unauthorized
-                "404":
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ErrorResponse'
-                    description: Asset not found
-                "422":
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ErrorResponse'
-                    description: Reserved tag validation error
-                "500":
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/ErrorResponse'
-                    description: Internal server error
-            summary: Update asset tags
             tags:
                 - file
     /api/assets/from-hash:
