@@ -214,7 +214,7 @@ class SaveAnimatedWEBP(IO.ComfyNode):
             ],
             hidden=[IO.Hidden.prompt, IO.Hidden.extra_pnginfo],
             is_output_node=True,
-            outputs=[IO.Image.Output()]
+            outputs=[IO.Image.Output(display_name="images")]
         )
 
     @classmethod
@@ -249,7 +249,7 @@ class SaveAnimatedPNG(IO.ComfyNode):
             ],
             hidden=[IO.Hidden.prompt, IO.Hidden.extra_pnginfo],
             is_output_node=True,
-            outputs=[IO.Image.Output()]
+            outputs=[IO.Image.Output(display_name="images")]
         )
 
     @classmethod
@@ -1199,6 +1199,7 @@ class SaveImageAdvanced(IO.ComfyNode):
             ],
             hidden=[IO.Hidden.prompt, IO.Hidden.extra_pnginfo],
             is_output_node=True,
+            outputs=[IO.Image.Output(display_name="images")]
         )
 
     @classmethod
@@ -1236,7 +1237,7 @@ class SaveImageAdvanced(IO.ComfyNode):
             results.append({"filename": file, "subfolder": subfolder, "type": "output"})
             counter += 1
 
-        return IO.NodeOutput(ui={"images": results})
+        return IO.NodeOutput(images, ui={"images": results})
 
 
 class ImagesExtension(ComfyExtension):
